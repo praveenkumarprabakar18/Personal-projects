@@ -1,0 +1,241 @@
+---
+title: "Time Series Forecasting of Reliance Industry Limited Stock Price"
+author:
+- 1. Praveen Kumar P (2022H1540826P)
+- 2. Prasad A (2022H1540814P)
+- 3. Sanjeev S (2022H1540837P)
+- 4. R Naven (2022H1540835P)
+- 5. Parul Shrivastava (2022H1540845P)
+date: "04-05-2023"
+output:
+  word_document:
+    toc: yes
+  html_document:
+    theme: yeti
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+subtitle: Group No. 6
+---
+
+### 1. Statement of purpose: -
+ - To find the best fit model for predicting the stock price of Reliance Industries Limited and to predict the future prices of the stock.
+ - **Key issues raised**: To check for the influence of trend,seasonality on the stock price time series and to also ensure the series was stationary.
+
+### 2. Background: -
+ - For the project requirements,the background reading involved analysing stock prices of various companies which generally could be converted as an effective time series data and Reliance stock prices were the one with which we decided to move ahead.
+ - We obtained the reliance stock price dataset using the getSymbols function from the quantmod library in R Programming Language to conceptualize our project.
+ - We then used the library rugarch comprises of functions that are required for specifying and fitting the model.
+ - We then used the tseries model to convert the data into a time series data.
+ - We then used the tidyverse model for data manipulation and initialising the time series as a data frame.
+
+### 3,4. Methods and Results: -
+Steps:
+ - 1). The project’s objective was to forecast the stock prices of Reliance Industries Limited at a future time period by creating an effective time series model and to check the accuracy of the model chosen by comparing the test data and the predicted data.
+ - 2). We then tested the GJRGARCH model with the dataset and used the functions in R language like ugarchfit and ugarchforecast to obtain the results.
+ - 3). Using the code below,we had determined the good fit model and the forecasted stock prices from the forecasted returns.
+
+```{r}
+
+library(quantmod) # Scrapping
+library(rugarch) # Specification and Estimation
+library(xts) # Manipulation
+library(PerformanceAnalytics) # Analyze the performance
+library(dplyr)
+library(tidyverse)
+library(tseries)
+library(forecast)
+
+```
+**Inference: -**
+  - The library quantmod comprises of functions that are required for scrapping.
+  - The library rugarch comprises of functions that are required for estimation, filtering, forecasting, simulation, inference tests and plots.
+  - The library xts comprises of functions that provide extensible time series class, enabling uniform handling of many R time series classes.
+   - The library PerformanceAnalytics provides an R package of econometric functions for performance and risk analysis of financial instruments or portfolios.
+   
+#### For our project,we are considering the Reliance Stock price dataset - "RELIANCE.NS" which we would convert into a time series and then use specific models like ARMA-GJRGARCH to predict its future stock price.
+
+```{r}
+getSymbols("RELIANCE.NS", from = "2010-01-01", to = Sys.Date())
+chartSeries(RELIANCE.NS)
+head(RELIANCE.NS)
+tail(RELIANCE.NS)
+chartSeries(RELIANCE.NS["2023-04"])
+
+#These functions are used to obtain the Reliance Stock Price dataset using getSymbols and print a chart of the dataset in the form of a time series plot.
+
+return = CalculateReturns(RELIANCE.NS$RELIANCE.NS.Adjusted)
+return = return[-c(1),]
+head(return)
+#This Calculate function is used to calculate the returns from stock price which can be further used to check volatality and fit a GARCH model.
+```
+
+
+```{r}
+chart_Series(return)
+chart.Histogram(return,methods = c("add.density","add.normal"),
+                colorset = c("blue","red","black"))
+legend("topright",legend=c("return","kernel","normal dist"),
+       fill = c('blue','red','black'))
+```
+
+**Inference: - **
+ - Here,we first create a chart showing the returns of the stock price time series and then create a histogram showcasing kernel,normality and other specifications using the appropriate colours.
+
+```{r}
+ndiffs(return)
+#nsdiffs(return)
+```
+
+**Inference: - **
+ - ndiffs is used to check if any difference is required in the data to avoid trend.
+ - As the data is non seasonal data,we need not use the nsdiffs function.
+ 
+```{r}
+library(astsa)
+acf2(return)
+library(forecast)
+auto.arima(return)
+return <- na.omit(return)
+adf.test(return)  
+kpss.test(return)
+```
+
+**Inference: - **
+ - Acf2 returns ACF and PACF plot which we used to find if any AR,MA components exist in the data. Here we weren't able to exactly find order of AR,MA components.
+ - na.omit() function is used to omit NA records in the return data which might be due to market holidays.
+ - The adf.test performs the Augmented Dickey-Fuller test for the null hypothesis of a unit root of a univarate time series and suggests that the data is stationary here.
+ - The kpss.test computes the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test for the null hypothesis that x is level or trend stationary. Kpss test also suggests that the data is stationary.
+
+```{r}
+
+chart.RollingPerformance(R = return["2010::2023"], width = 22,
+                         FUN = "sd.annualized",scale = 252,
+                         main = "Reliance's monthly volatility")
+```
+
+***A wrapper to create a chart of rolling performance metrics in a line chart and which shows Reliance's monthly volatility using returns data.***
+
+#### We are now using the GJRGARCH(1,0) model to specify,fit the model and predict the future stock prices.
+#We go for GJRGARCH model to capture the news impact better in the model
+
+```{r}
+armaOrder <- c(0,0)
+
+# We are defining the ARMA order to be 0,0 as we can't find evident AR, MA components from the ACF, PACF plot
+
+garchOrder <- c(1,0)
+
+# We are defining the GARCH order to be 1,0
+
+varModel <- list(model = "gjrGARCH", garchOrder = garchOrder)
+
+mod_specify <- ugarchspec(varModel, mean.model = list(armaOrder = armaOrder),distribution.model = "sstd")
+
+#Here we are specifying the model distribution as sstd which is used to compute density, distribution function, quantile function and to generate random variates for the skew Student-t distribution.
+
+mod_fitting = ugarchfit(data = return,spec = mod_specify,out.sample = 20)
+mod_fitting
+plot(mod_fitting, which = 'all')
+?ugarchfit
+
+#Ugarchfit is a method for fitting a variety of univariate GARCH models.
+```
+
+#### Predict future returns using ugarchforecast which provides methods for forecasting from a variety of univariate GARCH models.n.ahead represents the forecast horizon.
+
+#### We also plot the forecasts to obtain a visual of the predicted forecasts.
+
+```{r}
+returns_pred <- ugarchforecast(mod_fitting, n.ahead = 20)
+returns_pred <- as.numeric(returns_pred@forecast$seriesFor[1:20])
+plot(returns_pred)
+```
+
+#### Calculate the predicted stock price based on the forecasted returns using the tail function.
+
+```{r}
+last_price <- tail(RELIANCE.NS$RELIANCE.NS.Adjusted, 1)
+last_price
+```
+
+#### With the help of predicted returns we are calculating predicted prices for next 20 days
+
+```{r}
+predicted_prices <- c()
+for (i in seq_along(returns_pred)) {
+  predicted_price <- last_price * (1 + sum(returns_pred[1:i]))
+  predicted_prices <- c(predicted_prices, predicted_price)
+}
+
+predicted_prices
+```
+
+#### Converting the predicted prices data to a time series data in order to plot with the past data
+
+```{r}
+ts_pred <- ts(predicted_prices, start = 17, frequency = 1)
+```
+
+#### Plot the original and predicted prices
+
+```{r}
+autoplot(ts(RELIANCE.NS$RELIANCE.NS.Adjusted["2023-04"])) +
+  autolayer((ts_pred), series = "Predicted Prices", linetype = "dashed") +
+  ggtitle("Reliance Industries Ltd. (RELIANCE.NS)") +
+  ylab("Price (INR)") +
+  xlab("Last 17 working days and next 20 predicted days") +
+  guides(colour = guide_legend(title = "Series"))
+```
+
+#### Now we are going to measure the accuracy of the model, by splitting into train and test data. 
+
+```{r}
+n = 20
+armaOrder2 <- c(0,0) # ARMA order
+garchOrder2 <- c(1,0) # GARCH order
+varModel2 <- list(model = "gjrGARCH", garchOrder = garchOrder)
+mod_specify2 <- ugarchspec(varModel, mean.model = list(armaOrder = armaOrder), distribution.model = "sstd")
+l2 <- length((return$RELIANCE.NS.Adjusted))- n
+train<-head((return$RELIANCE.NS.Adjusted), l2)
+test<-tail((RELIANCE.NS$RELIANCE.NS.Adjusted),n)
+mod_fitting2 = ugarchfit(data = train,spec = mod_specify,out.sample = n)
+returns_pred2 <- ugarchforecast(mod_fitting2, n.ahead = nrow(test))
+returns_pred2
+returns_pred2 <- as.numeric(returns_pred2@forecast$seriesFor[1:20])
+train_price<-head((RELIANCE.NS$RELIANCE.NS.Adjusted), l2)
+last<-tail(train_price,1)
+predicted_prices2 <- c()
+predicted_price2<-c()
+for (i in seq_along(returns_pred2)) {
+  predicted_price2 <- last_price * (1 + sum(returns_pred2[1:i]))
+  predicted_prices2 <- c(predicted_prices2, predicted_price2)
+}
+predicted_prices2
+```
+
+#### Finding the accuracy of the model by calculating MAPE value using test and predicted price data
+
+```{r}
+mape <- function(actual, predicted) {
+  mean(abs((actual - predicted)/actual))*100
+}
+mape(test, predicted_prices2)
+```
+
+### 5. Conclusion: -
+ - Thus,from the above methods and results,we have tried obtaining the best model which can be used to analyse and forecast the stock prices,and we have also checked the accuracy of our model.
+ - Through this project,we learnt about the various Time series models which can be used to fit and forecast and also about various R packages used for creating a time series model and performing statistical and analytical functions and also effectively deciphering the information from the plots to obtain the required results.
+ - This project has given us an idea on how to deal with complex time series data and models and thereby fit better models.
+
+### 6. Critique: -
+
+ - The presence of temporal dependencies, which might influence the chosen statistical models and methodologies, is one of the major issues in time series analysis. 
+ - Furthermore, if time series data are not handled properly, external influences like seasonality, trends, and outliers may skew or produce inaccurate results.
+ - The necessity to analyse the model's performance using relevant metrics, such as mean absolute percetnage error and the choice of an acceptable evaluation window to judge the model's propensity to anticipate future values are both crucial factors in time series projects.
+ - The effectiveness of the model and the precision of the predictions must also be taken into account when considering the effects of data preparation, such as missing data imputation, normalisation, and smoothing.
+ - The choice of models and procedures, data pretreatment, and proper assessment metrics are only a few of the many complicated and difficult issues that must be carefully taken into account while performing time series analysis.
+- Though we have explored different orders and models to come with this model, we understand that MAPE value can be further decreased by performing further deep analysis.
+
+
